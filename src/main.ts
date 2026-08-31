@@ -391,7 +391,7 @@ function advanceGenius(): void {
   const ranking = geniusRanking();
   const leader = ranking[0] ?? null;
   const asked = new Set(geniusResponses.map((response) => response.questionId));
-  if (leader && shouldGuessGeniusPerson(ranking, geniusQuestions, asked, geniusResponses.length)) {
+  if (leader && shouldGuessGeniusPerson(ranking, geniusResponses.length)) {
     geniusQuestion = null;
     geniusGuess = leader;
     renderGenius();

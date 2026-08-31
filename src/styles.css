@@ -378,3 +378,25 @@ footer { font-size: 12px; }
 @media (hover:hover) and (pointer:fine) { .genius-mascot-choice:hover{border-color:rgba(125,143,232,.55);background:rgba(125,143,232,.08)}.genius-answers button:hover{border-color:rgba(125,143,232,.55);background:rgba(125,143,232,.1)}.genius-reset:hover{color:var(--text)}.genius-wrong:hover{border-color:rgba(136,157,198,.42);background:rgba(255,255,255,.08)} }
 @media (max-width:780px) { .genius-heading{grid-template-columns:1fr;align-items:start}.genius-heading>span{grid-column:auto}.genius-root{min-height:480px;padding:20px 0}.genius-question-stage{grid-template-columns:1fr;text-align:center}.genius-question-stage .genius-character{width:170px;height:190px;margin-top:-10px}.genius-question-stage h2{text-align:center}.genius-question-panel h2{min-height:auto}.genius-guess-actions{flex-direction:column;width:100%}.genius-guess-actions button{width:100%} }
 @media (max-width:540px) { .genius-root{padding-top:14px}.genius-panel{padding:26px 18px;border-radius:22px}.genius-mascot-picker{gap:8px}.genius-mascot-choice{height:164px;padding:0 8px;border-radius:16px}.genius-mascot-choice .genius-character{height:164px}.genius-orb{width:86px;height:86px;font-size:36px}.genius-panel h2{font-size:30px}.genius-progress{margin-bottom:18px}.genius-answers{margin-top:22px}.genius-result-visual{height:226px}.genius-result-visual .genius-character{height:236px}.genius-result-visual .genius-avatar{width:86px;height:86px}.genius-start{width:100%} }
+
+/* Compact phone layout: desktop sizing above remains unchanged. */
+@media (max-width:540px) {
+  .mode-grid { gap:10px; }
+  .mode-card { min-height:0; padding:13px 15px; border-radius:17px; }
+  .mode-card::after { right:-82px; bottom:-112px; }
+  .mode-index { top:14px; right:16px; font-size:10px; }
+  .mode-icon { width:34px; height:34px; margin-bottom:0; border-radius:11px; font-size:16px; }
+  .mode-card strong { margin-top:8px; font-size:20px; line-height:1.1; }
+  .mode-card p { max-width:none; margin:4px 0 8px; font-size:12px; line-height:1.4; }
+  .mode-action { min-height:18px; margin-top:0; font-size:11px; line-height:18px; }
+  .mode-action i { font-size:14px; line-height:1; }
+
+  .guess-row { grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; padding:5px; border-radius:12px; }
+  .player-cell { min-height:52px; gap:8px; padding:6px 8px; }
+  .player-cell .avatar { width:36px; height:36px; }
+  .player-cell small { margin-top:1px; font-size:10px; }
+  .feedback-cell { min-height:56px; gap:2px; padding:4px; border-radius:8px; }
+  .feedback-cell small { font-size:9px; }
+  .feedback-cell strong { font-size:11px; line-height:1.15; }
+  .feedback-cell em { font-size:13px; }
+}

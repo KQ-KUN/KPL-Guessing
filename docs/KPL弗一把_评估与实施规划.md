@@ -449,7 +449,7 @@ targetIndex = seededRandom(seed) % pool.length
 | 2K → 弗一把 | 首页/选手库提供“去姊妹站猜选手”的普通入口 | MVP 不携带目标选手，避免把答案写进 URL |
 | 用户状态 | 各自使用独立 `localStorage`，不跨域同步战绩或设置 | 不增加账号、Cookie、OAuth 和跨域隐私负担 |
 
-现有 `KPL 2K` 生产入口暂按 `https://kpl2k.hkq2297409816.workers.dev/` 接入。正式修改对方站点前先确定 KPL 弗一把的稳定生产 URL，再一次性补齐反向导航、选手深链、断链检查和两个站点的版本说明。
+现有 `KPL 2K` 生产入口按 `https://kpl2k-kpl2k-d0gigrx6e89914f65.webapps.tcloudbase.com` 接入。正式修改对方站点前先确定 KPL Guessing 的稳定生产 URL，再一次性补齐反向导航、选手深链、断链检查和两个站点的版本说明。
 
 ## 10. 验收与测试
 

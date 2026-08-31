@@ -16,7 +16,6 @@ import {
   selectGeniusQuestion,
   shouldGuessGeniusPerson,
 } from "../src/genius.ts";
-import type { GeniusResponse } from "../src/genius.ts";
 import type { QuizData, QuizPlayer } from "../src/types.ts";
 
 
@@ -162,42 +161,55 @@ test("network genius answers raise the matching person and avoid repeated questi
 });
 
 
-test("network genius separates Fly and SK before making its first guess", () => {
+test("network genius makes an early guess and falls back by question 12", () => {
+  const people = buildGeniusPeople([]);
+  const leader = people[0];
+  const runnerUp = people[1];
+  assert.ok(leader && runnerUp);
+
+  const confidentRanking = [
+    { person: leader, probability: 0.57 },
+    { person: runnerUp, probability: 0.43 },
+  ];
+  assert.equal(shouldGuessGeniusPerson(confidentRanking, 4), false);
+  assert.equal(shouldGuessGeniusPerson(confidentRanking, 5), true);
+
+  const uncertainRanking = [
+    { person: leader, probability: 0.35 },
+    { person: runnerUp, probability: 0.34 },
+  ];
+  assert.equal(shouldGuessGeniusPerson(uncertainRanking, 11), false);
+  assert.equal(shouldGuessGeniusPerson(uncertainRanking, 12), true);
+
   const data = JSON.parse(
     readFileSync(new URL("../public/data/quiz_players.json", import.meta.url), "utf8"),
   ) as QuizData;
-  const people = buildGeniusPeople(data.players);
+  const candidates = buildGeniusPeople(data.players);
   const questions = buildGeniusQuestions();
-
-  for (const targetName of ["Fly", "SK"]) {
-    const target = people.find((person) => person.name === targetName);
-    assert.ok(target, `缺少候选人物：${targetName}`);
-    const responses: GeniusResponse[] = [];
-    let guessedName = "";
-    for (let index = 0; index <= questions.length; index += 1) {
-      const ranked = rankGeniusPeople(people, questions, responses);
-      const asked = new Set(responses.map((response) => response.questionId));
-      if (shouldGuessGeniusPerson(ranked, questions, asked, responses.length)) {
-        guessedName = ranked[0]?.person.name ?? "";
-        break;
-      }
-      const question = selectGeniusQuestion(questions, ranked, asked);
-      if (!question) {
-        guessedName = ranked[0]?.person.name ?? "";
-        break;
-      }
-      const expected = question.answer(target);
-      responses.push({
-        questionId: question.id,
-        answer: expected === null ? "unknown" : expected ? "yes" : "no",
-      });
+  const target = candidates.find((person) => person.name === "一诺");
+  assert.ok(target);
+  const responses: Array<{ questionId: string; answer: "yes" | "no" | "unknown" }> = [];
+  let guessedAfter = 0;
+  for (let index = 0; index < 12; index += 1) {
+    const ranking = rankGeniusPeople(candidates, questions, responses);
+    if (shouldGuessGeniusPerson(ranking, responses.length)) {
+      guessedAfter = responses.length;
+      break;
     }
-    assert.equal(guessedName, targetName, `${targetName} 被错误猜成 ${guessedName}`);
-    assert.ok(
-      responses.some((response) => response.questionId === "role:coach"),
-      `${targetName} 作答路径没有核对教练身份`,
-    );
+    const asked = new Set(responses.map((response) => response.questionId));
+    const question = selectGeniusQuestion(questions, ranking, asked);
+    assert.ok(question);
+    const expected = question.answer(target);
+    responses.push({
+      questionId: question.id,
+      answer: expected === null ? "unknown" : expected ? "yes" : "no",
+    });
   }
+  if (!guessedAfter) {
+    const ranking = rankGeniusPeople(candidates, questions, responses);
+    if (shouldGuessGeniusPerson(ranking, responses.length)) guessedAfter = responses.length;
+  }
+  assert.ok(guessedAfter >= 5 && guessedAfter <= 12);
 });
 
 

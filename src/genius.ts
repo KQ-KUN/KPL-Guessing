@@ -265,21 +265,14 @@ export function rankGeniusPeople(
 
 export function shouldGuessGeniusPerson(
   ranked: RankedPerson[],
-  questions: GeniusQuestion[],
-  askedIds: ReadonlySet<string>,
   responseCount: number,
 ): boolean {
   const leader = ranked[0];
-  const runnerUp = ranked[1];
-  if (!leader || responseCount < 7 || leader.probability < 0.82) return false;
-  if (!runnerUp) return true;
-  if (leader.probability < runnerUp.probability * 6) return false;
-  return !questions.some((question) => {
-    if (askedIds.has(question.id)) return false;
-    const leaderAnswer = question.answer(leader.person);
-    const runnerUpAnswer = question.answer(runnerUp.person);
-    return leaderAnswer !== null && runnerUpAnswer !== null && leaderAnswer !== runnerUpAnswer;
-  });
+  return Boolean(
+    leader
+    && responseCount >= 5
+    && (leader.probability >= 0.56 || responseCount >= 12),
+  );
 }
 
 export function selectGeniusQuestion(
