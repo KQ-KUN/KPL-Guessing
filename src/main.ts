@@ -39,6 +39,9 @@ import type {
 
 
 const STORAGE_PREFIX = "kpl-friberg-v2";
+function trackEvent(event: "guessing-start" | "guessing-complete" | "guessing-restart"): void {
+  (window as Window & { KPLAnalytics?: { trackEvent: (name: string) => void } }).KPLAnalytics?.trackEvent(event);
+}
 type AppView = "home" | "classic" | "genius" | "library";
 type Theme = "dark" | "light";
 type GeniusMascotVariant = "female" | "male";
@@ -173,9 +176,18 @@ function showView(): void {
   geniusView.hidden = currentView !== "genius";
   libraryView.hidden = currentView !== "library";
   guessDock.hidden = !appReady || currentView !== "classic" || game.finished;
+  trackClassicStart();
   if (appReady && currentView === "genius") renderGenius();
   if (appReady && currentView === "library") renderLibrary();
   window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+let trackedClassicGame: StoredGame | null = null;
+function trackClassicStart(): void {
+  if (appReady && currentView === "classic" && !game.finished && trackedClassicGame !== game) {
+    trackedClassicGame = game;
+    trackEvent("guessing-start");
+  }
 }
 
 
@@ -300,6 +312,7 @@ async function loadGame(forceNew = false): Promise<void> {
   formMessage.textContent = "";
   closeSuggestions();
   render();
+  trackClassicStart();
 }
 
 
@@ -375,6 +388,7 @@ function geniusRanking(): RankedPerson[] {
 
 
 function resetGenius(started = true): void {
+  if (started) trackEvent("guessing-start");
   geniusResponses = [];
   geniusExcludedIds = new Set();
   geniusGuess = null;
@@ -573,7 +587,10 @@ function renderGeniusGuess(): void {
     restart.className = "genius-start";
     restart.type = "button";
     restart.textContent = "再想一个人物";
-    restart.addEventListener("click", () => resetGenius(true));
+    restart.addEventListener("click", () => {
+      trackEvent("guessing-restart");
+      resetGenius(true);
+    });
     actions.append(restart);
   } else {
     const correct = document.createElement("button");
@@ -582,6 +599,7 @@ function renderGeniusGuess(): void {
     correct.textContent = "就是他";
     correct.addEventListener("click", () => {
       geniusFinished = true;
+      trackEvent("guessing-complete");
       renderGenius();
     });
     const wrong = document.createElement("button");
@@ -965,6 +983,7 @@ function renderResult(target: QuizPlayer): void {
   next.type = "button";
   next.textContent = "再来一局";
   next.addEventListener("click", () => {
+    trackEvent("guessing-restart");
     void loadGame(true);
   });
 
@@ -1113,6 +1132,7 @@ function submitGuess(): void {
   game.guesses.push(player.id);
   game.won = player.id === game.targetId;
   game.finished = game.won || game.guesses.length >= MAX_GUESSES;
+  if (game.finished) trackEvent("guessing-complete");
   selectedPlayerId = "";
   guessInput.value = "";
   formMessage.textContent = "";
@@ -1137,6 +1157,7 @@ function revealAnswer(): void {
   if (game.finished) return;
   game.finished = true;
   game.won = false;
+  trackEvent("guessing-complete");
   saveGame();
   render();
   requestAnimationFrame(() => {
