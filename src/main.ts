@@ -111,7 +111,7 @@ function initialTheme(): Theme {
   } catch {
     // System preference remains available when storage is blocked.
   }
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "light";
 }
 
 
