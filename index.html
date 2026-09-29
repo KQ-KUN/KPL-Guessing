@@ -10,7 +10,7 @@
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
     <header class="site-header">
-      <a class="brand" href="#home" aria-label="返回首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i></span><span>KPL Guessing<small>PLAYER DEDUCTION GAME</small></span></a>
+      <a class="brand" href="#home" aria-label="返回首页"><span class="brand-mark" aria-hidden="true"><img src="./guessing-mark.svg" alt=""></span><span>KPL Guessing<small>选手推理 · 趣味竞猜</small></span></a>
       <nav class="header-actions" aria-label="主要导航"><a href="#home">首页</a><button id="rules-button" class="text-button" type="button">游戏规则</button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换浅色模式"><span aria-hidden="true">☀</span><span class="theme-label">浅色</span></button><a class="sister-link" href="https://kpl2k-kpl2k-d0gigrx6e89914f65.webapps.tcloudbase.com" target="_blank" rel="noreferrer">KPL 2K ↗</a></nav>
     </header>
 
@@ -23,7 +23,7 @@
             <p class="hero-subtitle">根据战队、位置与生涯荣誉，逐步锁定本局的 KPL 选手。</p>
             <div class="hero-actions"><a class="hero-primary" href="#classic">开始弗一把 <span>→</span></a><a class="hero-secondary" href="#library">浏览人物图鉴</a></div>
           </div>
-          <div class="hero-preview" aria-hidden="true"><div class="preview-head"><span>CLASSIC / 8 GUESSES</span><b>弗一把</b></div><div class="preview-player"><span class="preview-avatar">?</span><div><strong>猜出这名选手</strong><small>属性反馈会缩小答案范围</small></div></div><div class="preview-grid"><span class="exact">战队 ✓</span><span class="partial">位置 ≈</span><span class="direction">首秀 ↑</span><span class="miss">FMVP ×</span></div><div class="preview-progress"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="hero-preview" aria-hidden="true"><div class="preview-head"><span>CLASSIC / 8 GUESSES</span><b>弗一把</b></div><div class="preview-player"><span class="preview-avatar">?</span><div><strong>猜出这名选手</strong><small>属性反馈会缩小答案范围</small></div></div><div class="preview-grid"><span class="exact">战队 ✓</span><span class="partial">位置 ≈</span><span class="direction">首秀 ↑</span><span class="miss">FMVP ×</span></div><div class="preview-progress"><img src="./guessing-mark.svg" alt=""><img src="./guessing-mark.svg" alt=""><img src="./guessing-mark.svg" alt=""><img src="./guessing-mark.svg" alt=""></div></div>
         </div>
         <div class="mode-grid" aria-label="功能入口">
           <a class="mode-card classic-card" href="#classic"><span class="mode-top"><span class="mode-index">01</span><span class="mode-icon" aria-hidden="true">▦</span></span><strong>弗一把</strong><p>每局随机一名目标选手，八次机会，根据七项属性反馈推理答案。</p><span class="mode-action">开始猜选手 <i>→</i></span></a>
@@ -53,7 +53,7 @@
       <section id="library-view" class="app-view library-view" aria-labelledby="library-title" hidden>
         <header class="view-header library-heading"><a class="back-link" href="#home">← 返回首页</a><div><p class="eyebrow">KPL PLAYER ARCHIVE</p><h1 id="library-title">人物图鉴</h1><p>从战队出发，查看选手的年度表现与英雄池。</p></div><span class="library-kicker">与 KPL 2K 数据同源</span></header>
         <p id="library-meta" class="library-meta">正在载入图鉴…</p>
-        <div class="library-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="library-query" type="search" placeholder="搜索选手，如 Fly / 小胖 / 一诺" /></label><select id="library-team" aria-label="筛选战队"><option value="">全部战队</option></select><select id="library-position" aria-label="筛选位置"><option value="">全部位置</option><option>对抗路</option><option>打野</option><option>中路</option><option>发育路</option><option>游走</option></select><select id="library-sort" aria-label="排序方式"><option value="active">现役优先</option><option value="name">名字</option><option value="-mvp">MVP 总数 ↓</option><option value="-recent">最近登场</option></select></div>
+        <div class="library-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="library-query" aria-label="搜索选手" type="search" placeholder="搜索选手，如 Fly / 小胖 / 一诺" /></label><select id="library-team" aria-label="筛选战队"><option value="">全部战队</option></select><select id="library-position" aria-label="筛选位置"><option value="">全部位置</option><option>对抗路</option><option>打野</option><option>中路</option><option>发育路</option><option>游走</option></select><select id="library-sort" aria-label="排序方式"><option value="active">现役优先</option><option value="name">名字</option><option value="-mvp">MVP 总数 ↓</option><option value="-recent">最近登场</option></select></div>
         <div id="library-list" class="library-list"></div>
       </section>
     </main>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#244A66" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <title>人物竞猜：人物与问号</title>
+  <circle cx="24" cy="24" r="8"/>
+  <path d="M10 50v-4a14 14 0 0 1 28 0v4M42 19a6 6 0 0 1 12 0c0 5-6 5-6 10"/>
+  <circle cx="48" cy="37" r="1.5" fill="#244A66" stroke="none"/>
+</svg>

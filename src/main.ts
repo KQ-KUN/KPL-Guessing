@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./editorial.css";
 
 import {
   MAX_GUESSES,
@@ -128,7 +129,7 @@ function applyTheme(theme: Theme): void {
   if (label) label.textContent = nextTheme === "light" ? "浅色" : "深色";
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute(
     "content",
-    theme === "dark" ? "#080d1b" : "#f3f6fb",
+    theme === "dark" ? "#1C1B19" : "#F6F2E9",
   );
 }
 
@@ -334,7 +335,7 @@ function createAvatar(player: QuizPlayer, large = false): HTMLSpanElement {
     image.loading = "lazy";
     image.decoding = "async";
     image.referrerPolicy = "no-referrer";
-    image.src = player.iconUrl;
+    image.src = player.iconUrl.startsWith("/assets/") ? `.${player.iconUrl}` : player.iconUrl;
     image.addEventListener("error", () => {
       image.remove();
       wrapper.textContent = fallback;
@@ -356,7 +357,7 @@ function createGeniusAvatar(person: GeniusPerson): HTMLSpanElement {
     image.alt = "";
     image.decoding = "async";
     image.referrerPolicy = "no-referrer";
-    image.src = person.iconUrl;
+    image.src = person.iconUrl.startsWith("/assets/") ? `.${person.iconUrl}` : person.iconUrl;
     image.style.objectPosition = person.iconPosition;
     image.addEventListener("error", () => {
       image.remove();
@@ -376,7 +377,7 @@ function createGeniusMascot(
   image.className = `genius-character ${variant}`;
   image.alt = "";
   image.decoding = "async";
-  image.src = `/assets/genius-mascot/${variant}-${pose}.webp`;
+  image.src = `./assets/genius-mascot/${variant}-${pose}.webp`;
   image.setAttribute("aria-hidden", "true");
   return image;
 }
@@ -641,7 +642,7 @@ function createLibraryAvatar(player: LibraryPlayer): HTMLSpanElement {
     image.loading = "lazy";
     image.decoding = "async";
     image.referrerPolicy = "no-referrer";
-    image.src = player.icon;
+    image.src = player.icon.startsWith("/assets/") ? `.${player.icon}` : player.icon;
     image.addEventListener("error", () => {
       image.remove();
       avatar.textContent = fallback;
