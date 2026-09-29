@@ -1,11 +1,13 @@
 export const DIFFICULTIES = ["popular", "normal", "hardcore"] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 export type GameMode = "classic";
-export type Feedback = "exact" | "partial" | "miss" | "higher" | "lower";
+export type Feedback = "exact" | "partial" | "miss" | "higher" | "lower" | "unknown";
 
 export interface QuizPlayer {
   id: string;
   nickname: string;
+  realName?: string;
+  officialPlayerIds?: string[];
   aliases: string[];
   iconUrl: string;
   positions: string[];
@@ -13,11 +15,15 @@ export interface QuizPlayer {
   latestTeamName: string;
   teamHistory: string[];
   teamHistoryNames: string[];
-  debutYear: number;
+  debutYear: number | null;
+  formalTeamCount?: number | null;
+  teamCountComplete?: boolean;
   latestYear: number;
   hasFmvp: boolean;
   championshipCount: number;
+  championshipVerified?: boolean;
   totalGames: number;
+  eventCount: number;
   peakRating: number;
   active: boolean;
   difficulty: Difficulty[];
@@ -32,6 +38,7 @@ export interface QuizData {
 }
 
 export interface GuessResult {
+  appearances: Feedback;
   playerId: string;
   positions: Feedback;
   latestTeam: Feedback;
@@ -39,11 +46,13 @@ export interface GuessResult {
   latestYear: Feedback;
   hasFmvp: Feedback;
   championshipCount: Feedback;
-  active: Feedback;
+  formalTeamCount: Feedback;
+  eventCount: Feedback;
   isCorrect: boolean;
 }
 
 export interface StoredGame {
+  playersHash?: string;
   storageVersion: 3;
   mode: GameMode;
   difficulty: Difficulty;

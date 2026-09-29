@@ -1,9 +1,13 @@
 import "./styles.css";
 import "./editorial.css";
+import { findLibraryPlayer, libraryPlayerId } from "./library-navigation.ts";
 
 import {
   MAX_GUESSES,
+  appearanceLabel,
   comparePlayers,
+  isAcceptedGuess,
+  isClassicEligible,
   feedbackSymbol,
   normalizeSearch,
   playersForDifficulty,
@@ -11,10 +15,12 @@ import {
   searchPlayers,
 } from "./game.ts";
 import {
+  GENIUS_MAX_QUESTIONS,
   buildGeniusPeople,
   buildGeniusQuestions,
   rankGeniusPeople,
   selectGeniusQuestion,
+  shouldDelayGeniusGuess,
   shouldGuessGeniusPerson,
 } from "./genius.ts";
 import type {
@@ -98,7 +104,7 @@ let suggestionIndex = -1;
 let visibleSuggestions: QuizPlayer[] = [];
 let loadSequence = 0;
 let geniusPeople: GeniusPerson[] = [];
-const geniusQuestions = buildGeniusQuestions();
+let geniusQuestions: GeniusQuestion[] = [];
 let geniusResponses: GeniusResponse[] = [];
 let geniusExcludedIds = new Set<string>();
 let geniusQuestion: GeniusQuestion | null = null;
@@ -109,6 +115,13 @@ let geniusMascotVariant: GeniusMascotVariant | null = null;
 
 
 function initialTheme(): Theme {
+  const entryUrl = new URL(window.location.href);
+  if (entryUrl.searchParams.get("theme") === "light") {
+    try { localStorage.setItem(THEME_KEY, "light"); } catch { /* Theme still applies without storage. */ }
+    entryUrl.searchParams.delete("theme");
+    window.history.replaceState(window.history.state, "", entryUrl);
+    return "light";
+  }
   try {
     const stored = localStorage.getItem(THEME_KEY);
     if (stored === "dark" || stored === "light") return stored;
@@ -165,7 +178,7 @@ function isLibraryData(value: unknown): value is LibraryData {
 function viewFromHash(): AppView {
   if (location.hash === "#classic") return "classic";
   if (location.hash === "#genius") return "genius";
-  if (location.hash === "#library") return "library";
+  if (location.hash === "#library" || location.hash.startsWith("#library?")) return "library";
   return "home";
 }
 
@@ -181,6 +194,39 @@ function showView(): void {
   if (appReady && currentView === "genius") renderGenius();
   if (appReady && currentView === "library") renderLibrary();
   window.scrollTo({ top: 0, behavior: "auto" });
+  if (appReady && currentView === "library") focusLibraryPlayer();
+}
+
+function focusLibraryPlayer(): void {
+  const id = libraryPlayerId(location.hash);
+  const player = id ? playerById.get(id) : undefined;
+  if (!player) return;
+  libraryQuery.value = "";
+  libraryTeam.value = "";
+  libraryPosition.value = "";
+  renderLibrary();
+  const entry = findLibraryPlayer(libraryData.players, player);
+  let card = entry ? document.getElementById(`library-player-${entry.id}`) : null;
+  if (card) {
+    card.querySelector<HTMLButtonElement>(".library-card-summary")?.click();
+  } else {
+    // 部分杯赛选手没有年度图鉴卡，只展示题库已有资料，不拼接同名人物。
+    card = document.createElement("article");
+    card.className = "library-card-item";
+    card.append(createPlayerCell(player));
+    const details = document.createElement("p");
+    details.className = "library-brief";
+    details.textContent = `${player.positions.join(" / ")} · 冠军 ${player.championshipCount} · 征战赛事 ${player.eventCount} · 小局数 ${player.totalGames}`;
+    card.append(details);
+    libraryList.prepend(card);
+  }
+  card.tabIndex = -1;
+  const targetCard = card;
+  requestAnimationFrame(() => {
+    if (!targetCard.isConnected || currentView !== "library") return;
+    targetCard.scrollIntoView({ block: "center", behavior: "auto" });
+    targetCard.focus({ preventScroll: true });
+  });
 }
 
 let trackedClassicGame: StoredGame | null = null;
@@ -207,16 +253,25 @@ function loadStoredGame(): StoredGame | null {
       value.mode !== mode ||
       value.difficulty !== difficulty ||
       value.dataVersion !== data.dataVersion ||
+      value.playersHash !== data.playersHash ||
       typeof value.targetId !== "string" ||
       !playerById.has(value.targetId) ||
+      !isClassicEligible(playerById.get(value.targetId)!) ||
       !Array.isArray(value.guesses) ||
       value.guesses.length > MAX_GUESSES ||
       new Set(value.guesses).size !== value.guesses.length ||
-      !value.guesses.every((id) => typeof id === "string" && playerById.has(id)) ||
+      !value.guesses.every((id) => typeof id === "string" && playerById.has(id) && isClassicEligible(playerById.get(id)!)) ||
       typeof value.finished !== "boolean" ||
       typeof value.won !== "boolean" ||
       typeof value.recorded !== "boolean" ||
-      !playerById.get(value.targetId)?.difficulty.includes(difficulty)
+      !playerById.get(value.targetId)?.difficulty.includes(difficulty) ||
+      value.won !== value.guesses.some((id) => {
+        const guess = playerById.get(id);
+        const target = playerById.get(value.targetId!);
+        return guess !== undefined && target !== undefined && isAcceptedGuess(guess, target);
+      }) ||
+      value.finished !== (value.won || value.guesses.length >= MAX_GUESSES) ||
+      (value.recorded && !value.finished)
     ) {
       return null;
     }
@@ -229,6 +284,7 @@ function loadStoredGame(): StoredGame | null {
 
 function saveGame(): void {
   try {
+    game.playersHash = data.playersHash;
     localStorage.setItem(storageKey(), JSON.stringify(game));
   } catch {
     formMessage.textContent = "浏览器无法保存进度，本局仍可继续。";
@@ -253,9 +309,9 @@ function loadStats(): Stats {
     const value = JSON.parse(raw) as Partial<Stats>;
     if (
       value.storageVersion !== 1 ||
-      typeof value.games !== "number" ||
-      typeof value.wins !== "number" ||
-      typeof value.totalWinningGuesses !== "number"
+      typeof value.games !== "number" || !Number.isInteger(value.games) || value.games < 0 ||
+      typeof value.wins !== "number" || !Number.isInteger(value.wins) || value.wins < 0 || value.wins > value.games ||
+      typeof value.totalWinningGuesses !== "number" || !Number.isInteger(value.totalWinningGuesses) || value.totalWinningGuesses < 0
     ) {
       return defaultStats();
     }
@@ -406,13 +462,16 @@ function advanceGenius(): void {
   const ranking = geniusRanking();
   const leader = ranking[0] ?? null;
   const asked = new Set(geniusResponses.map((response) => response.questionId));
-  if (leader && shouldGuessGeniusPerson(ranking, geniusResponses.length)) {
+  const nextQuestion = selectGeniusQuestion(geniusQuestions, ranking, asked);
+  if (leader
+    && shouldGuessGeniusPerson(ranking, geniusResponses.length)
+    && !shouldDelayGeniusGuess(nextQuestion, ranking, geniusResponses.length)) {
     geniusQuestion = null;
     geniusGuess = leader;
     renderGenius();
     return;
   }
-  geniusQuestion = selectGeniusQuestion(geniusQuestions, ranking, asked);
+  geniusQuestion = nextQuestion;
   geniusGuess = geniusQuestion ? null : leader;
   renderGenius();
 }
@@ -515,6 +574,14 @@ function renderGeniusIntro(): void {
 
 function renderGeniusQuestion(): void {
   if (!geniusQuestion) return;
+  const existing = geniusRoot.querySelector('.genius-question-panel');
+  if (existing) {
+    existing.querySelector('h2')!.textContent = geniusQuestion.text;
+    existing.querySelector('.genius-topline > span')!.textContent = `问题 ${geniusResponses.length + 1}`;
+    existing.querySelector('.genius-category')!.textContent = geniusQuestion.category;
+    existing.querySelector<HTMLElement>('.genius-progress i')!.style.width = `${Math.min(((geniusResponses.length + 1) / GENIUS_MAX_QUESTIONS) * 100, 100)}%`;
+    return;
+  }
   const panel = document.createElement("section");
   panel.className = "genius-panel genius-question-panel";
   const top = document.createElement("div");
@@ -528,7 +595,7 @@ function renderGeniusQuestion(): void {
   const progress = document.createElement("span");
   progress.className = "genius-progress";
   const progressFill = document.createElement("i");
-  progressFill.style.width = `${Math.min(((geniusResponses.length + 1) / geniusQuestions.length) * 100, 100)}%`;
+  progressFill.style.width = `${Math.min(((geniusResponses.length + 1) / GENIUS_MAX_QUESTIONS) * 100, 100)}%`;
   progress.append(progressFill);
   const stage = document.createElement("div");
   stage.className = "genius-question-stage";
@@ -549,7 +616,11 @@ function renderGeniusQuestion(): void {
     button.type = "button";
     button.dataset.answer = value;
     button.textContent = label;
-    button.addEventListener("click", () => answerGenius(value));
+    button.addEventListener("click", (event) => {
+      // A double click should answer one question, not consume the next one.
+      if (event.detail > 1) return;
+      answerGenius(value);
+    });
     answers.append(button);
   }
   const hint = document.createElement("p");
@@ -616,6 +687,11 @@ function renderGeniusGuess(): void {
 
 
 function renderGenius(): void {
+  if (geniusStarted && !geniusGuess && geniusRoot.querySelector('.genius-question-panel')) {
+    renderGeniusQuestion();
+    return;
+  }
+  const hadFocus = geniusRoot.contains(document.activeElement);
   geniusRoot.replaceChildren();
   if (!geniusStarted) {
     renderGeniusIntro();
@@ -625,7 +701,10 @@ function renderGenius(): void {
     renderGeniusQuestion();
   }
   if (currentView === "genius") {
-    requestAnimationFrame(() => geniusRoot.scrollIntoView({ block: "start", behavior: "auto" }));
+    if (hadFocus) {
+      const target = geniusRoot.querySelector<HTMLButtonElement>('button[data-answer="yes"], .genius-correct, .genius-mascot-choice, .genius-start:not(:disabled)');
+      target?.focus({ preventScroll: true });
+    }
   }
 }
 
@@ -678,6 +757,7 @@ function keyStats(version: LibraryVersion): string {
 function createLibraryCard(player: LibraryPlayer): HTMLElement {
   const card = document.createElement("article");
   card.className = "library-card-item";
+  card.id = `library-player-${player.id}`;
 
   const summary = document.createElement("button");
   summary.className = "library-card-summary";
@@ -700,7 +780,7 @@ function createLibraryCard(player: LibraryPlayer): HTMLElement {
   team.textContent = player.team;
   const status = document.createElement("span");
   status.className = `library-status${player.active || player.current_team ? "" : " retired"}`;
-  status.textContent = player.active ? "现役" : player.current_team ? `现役 · ${player.current_team}` : "退役";
+  status.textContent = player.active ? "本年有参赛记录" : player.current_team ? player.current_team : "暂无近期记录";
   identity.append(name, team, status);
 
   const toggle = document.createElement("span");
@@ -846,7 +926,7 @@ function createPlayerCell(player: QuizPlayer): HTMLDivElement {
   const name = document.createElement("strong");
   name.textContent = player.nickname;
   const detail = document.createElement("small");
-  detail.textContent = `${player.latestTeamName} · ${player.debutYear}–${player.latestYear}`;
+  detail.textContent = `${player.latestTeamName} · ${player.debutYear ?? "—"}–${player.latestYear}`;
   copy.append(name, detail);
   cell.append(copy);
   return cell;
@@ -885,11 +965,13 @@ function renderBoard(target: QuizPlayer): void {
       createPlayerCell(player),
       createFeedbackCell("最近战队", player.latestTeamName, result.latestTeam),
       createFeedbackCell("位置", player.positions.join("/"), result.positions),
-      createFeedbackCell("首秀", String(player.debutYear), result.debutYear),
+      createFeedbackCell("KPL首秀", player.debutYear == null ? "暂无记录" : String(player.debutYear), result.debutYear),
       createFeedbackCell("最近登场", String(player.latestYear), result.latestYear),
       createFeedbackCell("冠军", String(player.championshipCount), result.championshipCount),
-      createFeedbackCell("KPL FMVP", player.hasFmvp ? "拿过" : "未拿过", result.hasFmvp),
-      createFeedbackCell("状态", player.active ? "现役" : "退役", result.active),
+      createFeedbackCell("决赛 FMVP", player.hasFmvp ? "拿过" : "未拿过", result.hasFmvp),
+      createFeedbackCell("效力战队", player.formalTeamCount == null ? "—" : String(player.formalTeamCount), result.formalTeamCount),
+      createFeedbackCell("征战赛事", String(player.eventCount), result.eventCount),
+      createFeedbackCell("小局数", appearanceLabel(player.totalGames), result.appearances),
     );
     board.append(row);
   }
@@ -928,7 +1010,9 @@ function shareText(target: QuizPlayer): string {
       result.latestYear,
       result.championshipCount,
       result.hasFmvp,
-      result.active,
+      result.formalTeamCount,
+      result.eventCount,
+      result.appearances,
     ].map(feedbackEmoji).join("");
   });
   const score = game.won ? `${game.guesses.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
@@ -948,9 +1032,16 @@ async function copyShare(target: QuizPlayer): Promise<void> {
     textarea.style.opacity = "0";
     document.body.append(textarea);
     textarea.select();
-    document.execCommand("copy");
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
     textarea.remove();
-    formMessage.textContent = "战绩已复制，分享内容不含答案。";
+    formMessage.textContent = copied
+      ? "战绩已复制，分享内容不含答案。"
+      : "复制失败，请检查浏览器权限后重试。";
   }
 }
 
@@ -966,8 +1057,9 @@ function renderResult(target: QuizPlayer): void {
   const copy = document.createElement("div");
   const title = document.createElement("h2");
   title.textContent = game.won ? `${game.guesses.length} 次猜中 ${target.nickname}` : `答案是 ${target.nickname}`;
+  if (game.won && game.guesses.at(-1) !== target.id) title.textContent = `条件全部符合，算你猜中！本题原设选手：${target.nickname}`;
   const detail = document.createElement("p");
-  detail.textContent = `${target.positions.join("/")} · ${target.latestTeamName} · ${target.debutYear}–${target.latestYear}`;
+  detail.textContent = `${target.positions.join("/")} · ${target.latestTeamName} · ${target.debutYear ?? "—"}–${target.latestYear}`;
   copy.append(title, detail);
   head.append(copy);
 
@@ -990,8 +1082,8 @@ function renderResult(target: QuizPlayer): void {
 
   const library = document.createElement("a");
   library.className = "secondary-button";
-  library.href = "#library";
-  library.textContent = "去人物图鉴看详情";
+  library.href = `#library?player=${encodeURIComponent(target.id)}`;
+  library.textContent = "去选手图鉴看详情";
   actions.append(share, next, library);
   resultPanel.append(head, actions);
 }
@@ -1047,7 +1139,7 @@ function closeSuggestions(): void {
 function selectSuggestion(player: QuizPlayer): void {
   selectedPlayerId = player.id;
   guessInput.value = player.nickname;
-  formMessage.textContent = `${player.latestTeamName} · ${player.positions.join("/")} · ${player.debutYear}–${player.latestYear}`;
+  formMessage.textContent = `${player.latestTeamName} · ${player.positions.join("/")} · ${player.debutYear ?? "—"}–${player.latestYear}`;
   closeSuggestions();
 }
 
@@ -1080,7 +1172,7 @@ function renderSuggestions(): void {
     copy.append(name, detail);
     const years = document.createElement("span");
     years.className = "years";
-    years.textContent = `${player.debutYear}–${player.latestYear}`;
+    years.textContent = `${player.debutYear ?? "—"}–${player.latestYear}`;
     option.append(copy, years);
     option.addEventListener("click", () => selectSuggestion(player));
     suggestionsElement.append(option);
@@ -1122,7 +1214,7 @@ function resolveTypedPlayer(): QuizPlayer | null {
 function submitGuess(): void {
   if (game.finished) return;
   const player = resolveTypedPlayer();
-  if (!player) {
+  if (!player || !isClassicEligible(player)) {
     formMessage.textContent = "请从候选列表选择一名明确的选手；同名选手不能只按昵称提交。";
     return;
   }
@@ -1131,7 +1223,8 @@ function submitGuess(): void {
     return;
   }
   game.guesses.push(player.id);
-  game.won = player.id === game.targetId;
+  const target = playerById.get(game.targetId);
+  game.won = target !== undefined && isAcceptedGuess(player, target);
   game.finished = game.won || game.guesses.length >= MAX_GUESSES;
   if (game.finished) trackEvent("guessing-complete");
   selectedPlayerId = "";
@@ -1142,7 +1235,7 @@ function submitGuess(): void {
   render();
   requestAnimationFrame(() => {
     if (game.finished) {
-      resultPanel.scrollIntoView({ block: "center", behavior: "smooth" });
+      resultPanel.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       return;
     }
     guessInput.focus({ preventScroll: true });
@@ -1277,6 +1370,7 @@ async function start(): Promise<void> {
     libraryData = libraryValue;
     playerById = new Map(data.players.map((player) => [player.id, player]));
     geniusPeople = buildGeniusPeople(data.players);
+    geniusQuestions = buildGeniusQuestions(geniusPeople);
     setupLibraryFilters();
     loadSettings();
     currentView = viewFromHash();

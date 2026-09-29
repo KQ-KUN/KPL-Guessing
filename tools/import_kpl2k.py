@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT.parent / "KPL 2K"
+DEFAULT_SOURCE = ROOT.parent
 DEFAULT_OUTPUT = ROOT / "public" / "data"
 DEFAULT_CONFIG = ROOT / "config" / "quiz.json"
 POSITION_ORDER = ("对抗路", "打野", "中路", "发育路", "游走")
@@ -24,6 +24,11 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def normalized_search_key(value: str) -> str:
     return "".join(value.casefold().split())
+
+
+def is_kpl_league(season: dict[str, Any]) -> bool:
+    # 官方league_type把2024起的挑杯也写作kpl，不能用它区分联赛与杯赛。
+    return str(season["season_id"]).startswith("KPL") or "KPL" in str(season.get("name", "")).upper()
 
 
 def source_commit(source: Path) -> str:
@@ -69,17 +74,24 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
         raise FileNotFoundError(f"KPL 2K 数据缺失：{', '.join(missing)}")
 
     config = load_json(config_path)
+    history_path = source / "data/curated/historical_appearances.json"
+    history_doc = load_json(history_path) if history_path.exists() else {}
+    history_profiles = history_doc.get("players", {})
+    official_path = source / "data/curated/official_player_profiles.json"
+    official_profiles = {p["playerId"]: p for p in load_json(official_path)["profiles"]} if official_path.exists() else {}
+    corrections_path = config_path.with_name("profile_corrections.json")
+    corrections = load_json(corrections_path).get("players", {}) if corrections_path.exists() else {}
     career_path = config_path.with_name("career_history.json")
     career_doc = load_json(career_path) if career_path.is_file() else {"players": {}}
     career_by_nickname = {
         str(nickname): value
         for nickname, value in career_doc.get("players", {}).items()
     }
-    roster_path = config_path.with_name("championship_rosters.json")
+    # 图鉴和题库使用同一份冠军首发，独立数据包仍兼容原配置位置。
+    roster_path = source / "data" / "curated" / "championships.json"
+    if not roster_path.is_file():
+        roster_path = config_path.with_name("championship_rosters.json")
     roster_doc = load_json(roster_path) if roster_path.is_file() else {"events": []}
-    roster_tracked_names = {
-        str(nickname) for nickname in roster_doc.get("trackedNicknames", [])
-    }
     roster_title_counts: Counter[str] = Counter()
     roster_event_ids: set[str] = set()
     for event in roster_doc.get("events", []):
@@ -107,6 +119,10 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
     data_version = str(next(iter(data_versions)))
 
     player_by_id = {str(item["player_id"]): item for item in players_doc["players"]}
+    player_id_aliases = config.get("playerIdAliases", {})
+    for alias_id, canonical_id in player_id_aliases.items():
+        if alias_id not in player_by_id or canonical_id not in player_by_id:
+            raise ValueError(f"选手身份映射不存在：{alias_id} -> {canonical_id}")
     season_by_id = {
         str(item["season_id"]): item
         for item in seasons_doc["seasons"]
@@ -115,6 +131,8 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
     franchise_by_id = {
         str(item["franchise_id"]): item for item in franchises_doc["franchises"]
     }
+    for team in history_doc.get("teams", {}).values():
+        franchise_by_id.setdefault(team["franchiseId"], {"franchise_id": team["franchiseId"], "current_names": [team["name"]]})
     minimum_games = int(config["minimumGamesPerEvent"])
     minimum_games_overrides = {
         str(name): int(value)
@@ -125,9 +143,11 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
     active_seasons = {str(value) for value in config["activeSeasonIds"]}
     unknown_player_ids: set[str] = set()
     records_by_player: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    career_records_by_player: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     for record in stats_doc["records"]:
         player_id = str(record["player_id"])
+        player_id = player_id_aliases.get(player_id, player_id)
         if player_id not in player_by_id:
             unknown_player_ids.add(player_id)
             continue
@@ -135,11 +155,23 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
             continue
         nickname = str(player_by_id[player_id].get("name", "")).strip()
         required_games = minimum_games_overrides.get(nickname, minimum_games)
-        if int(record.get("games", 0)) < required_games:
-            continue
         if record.get("position") not in POSITION_ORDER:
             continue
+        if int(record.get("games", 0)) > 0:
+            career_records_by_player[player_id].append(record)
+        if int(record.get("games", 0)) < required_games:
+            continue
         records_by_player[player_id].append(record)
+
+    # 旧 ID 与主 ID 可能同时拥有同一赛季统计，保留较完整记录，避免重复累计。
+    for grouping in (records_by_player, career_records_by_player):
+        for player_id, rows in grouping.items():
+            deduped = {}
+            for row in rows:
+                key = (row["season_id"], row.get("team_franchise"), row["position"])
+                if key not in deduped or row.get("games", 0) > deduped[key].get("games", 0):
+                    deduped[key] = row
+            grouping[player_id] = list(deduped.values())
 
     championship_seasons_by_player: dict[str, set[str]] = defaultdict(set)
     for player_id, records in records_by_player.items():
@@ -161,7 +193,7 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
             continue
 
         ordered_records = sorted(
-            records,
+            career_records_by_player[player_id],
             key=lambda row: (
                 str(season_by_id[str(row["season_id"])].get("end_time", "")),
                 str(row["season_id"]),
@@ -175,7 +207,7 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
             if latest_franchise
             else str(latest.get("team_name_current", latest_team_id))
         )
-        position_set = {str(row["position"]) for row in records}
+        position_set = {str(row["position"]) for row in ordered_records}
         team_history = list(
             dict.fromkeys(str(row.get("team_franchise", "")) for row in ordered_records if row.get("team_franchise"))
         )
@@ -187,18 +219,39 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
         ]
         event_ids = {str(row["season_id"]) for row in records}
         event_count = len(event_ids)
-        total_games = sum(int(row.get("games", 0)) for row in records)
+        total_games = sum(int(row.get("games", 0)) for row in ordered_records)
+        recorded_events = {str(row["season_id"]) for row in ordered_records}
+        historical_events = history_profiles.get(player_id, {}).get("events", [])
+        for historical in historical_events:
+            if historical["eventId"] not in recorded_events:
+                total_games += len(set(historical["matchIds"]))
+                recorded_events.add(historical["eventId"])
+        historical_teams = [fid for event in historical_events for fid in event.get("teamMatchIds", {})]
+        team_history = list(dict.fromkeys(historical_teams + team_history))
+        team_history_names = [current_franchise_name(franchise_by_id[fid]) if fid in franchise_by_id else fid for fid in team_history]
         peak_rating = max(float(row.get("rating", 0)) for row in records)
         source_championship_count = len(championship_seasons_by_player[player_id])
-        years = [int(season_by_id[str(row["season_id"])]["year"]) for row in records]
+        years = [int(season_by_id[str(row["season_id"])]["year"]) for row in ordered_records]
         source_debut_year = min(years)
         career = career_by_nickname.get(nickname)
-        debut_year = int(career["debutYear"]) if career else source_debut_year
-        championship_count = (
-            int(roster_title_counts[nickname])
-            if nickname in roster_tracked_names
-            else source_championship_count
-        )
+        kpl_records = [row for row in ordered_records if is_kpl_league(season_by_id[str(row["season_id"])])]
+        kpl_years = [int(season_by_id[str(row["season_id"])]["year"]) for row in kpl_records]
+        kpl_years.extend(int(event["year"]) for event in historical_events if event["eventId"].startswith("KPL"))
+        # 2019年前记录另有历史补充；杯赛首次参赛不能冒充KPL首秀。
+        debut_year = min(kpl_years) if kpl_years else None
+        if career and int(career["debutYear"]) < 2019:
+            debut_year = min(debut_year, int(career["debutYear"])) if debut_year is not None else int(career["debutYear"])
+        correction = corrections.get(player_id, {})
+        if "positions" in correction:
+            position_set = set(correction["positions"])
+        appearance_teams = sorted({str(row["team_franchise"]) for row in kpl_records if row.get("team_franchise")} | {
+            fid for event in historical_events if event["eventId"].startswith("KPL") for fid in event.get("teamMatchIds", {})
+        })
+        formal_team_count = len(appearance_teams)
+        # 2019为逐选手数据边界；早期履历不足时只能给出已确认的下限。
+        team_count_complete = debut_year is not None and debut_year > 2019
+        # 全题库按决赛首发计数，不能把冠军战队的赛季出场等同于个人夺冠。
+        championship_count = int(roster_title_counts[nickname])
         if career:
             career_audit.append(
                 {
@@ -209,7 +262,7 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
                     "sourceDebutYear": source_debut_year,
                 }
             )
-        if nickname in roster_tracked_names:
+        if championship_count != source_championship_count or championship_count:
             roster_audit.append(
                 {
                     "playerId": player_id,
@@ -222,11 +275,11 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
         difficulties = ["hardcore"]
         normal = config["normal"]
         if (
-            nickname in popular_names
+            (kpl_records or (debut_year is not None and debut_year < 2019)) and (nickname in popular_names
             or (
                 event_count >= int(normal["minimumEvents"])
                 and total_games >= int(normal["minimumGames"])
-            )
+            ))
         ):
             difficulties.insert(0, "normal")
         if nickname in popular_names:
@@ -237,11 +290,20 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
             eligible_http_icons += 1
         icon_url = raw_icon if raw_icon.startswith("https://") else ""
         search_key = normalized_search_key(nickname)
+        official = official_profiles.get(player_id, {})
+        real_names = official.get("realNames", [])
+        real_name = real_names[0] if len(real_names) == 1 else ""
         quiz_players.append(
             {
                 "id": player_id,
                 "nickname": nickname,
-                "aliases": [search_key] if search_key else [],
+                "realName": real_name,
+                "officialPlayerIds": official.get("officialPlayerIds", []),
+                "aliases": list(dict.fromkeys([search_key] + ([real_name] if real_name else []) + history_profiles.get(player_id, {}).get("aliases", []) + [
+                    str(player_by_id[alias_id]["name"])
+                    for alias_id, canonical_id in player_id_aliases.items()
+                    if canonical_id == player_id
+                ])),
                 "iconUrl": icon_url,
                 "positions": [position for position in POSITION_ORDER if position in position_set],
                 "latestTeamId": latest_team_id,
@@ -249,12 +311,17 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
                 "teamHistory": team_history,
                 "teamHistoryNames": team_history_names,
                 "debutYear": debut_year,
+                "formalTeamCount": formal_team_count,
+                "teamCountComplete": team_count_complete,
+                "kplAppearanceTeamIds": appearance_teams,
                 "latestYear": max(years),
-                "hasFmvp": nickname in fmvp_names,
+                "hasFmvp": correction.get("hasFmvp", nickname in fmvp_names),
                 "championshipCount": championship_count,
                 "totalGames": total_games,
+                "eventCount": len(recorded_events),
+                "championshipVerified": nickname not in roster_doc.get("unresolvedNicknames", []),
                 "peakRating": round(peak_rating, 1),
-                "active": bool(event_ids & active_seasons),
+                "active": any(str(row["season_id"]) in active_seasons for row in ordered_records),
                 "difficulty": difficulties,
             }
         )
@@ -276,6 +343,7 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
             player["latestYear"],
             player["hasFmvp"],
             player["championshipCount"],
+            player["formalTeamCount"],
             player["active"],
         )
         fingerprints[fingerprint].append(str(player["id"]))
@@ -301,6 +369,9 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
         "playersHash": snapshot["playersHash"],
         "sourcePlayers": len(player_by_id),
         "eligiblePlayers": len(quiz_players),
+        "classicEligiblePlayers": len(quiz_players),
+        "classicExcludedPlayers": 0,
+        "geniusEligiblePlayers": len(quiz_players),
         "poolCounts": {name: pool_counts[name] for name in ("popular", "normal", "hardcore")},
         "eligibleHttpsIcons": sum(bool(player["iconUrl"]) for player in quiz_players),
         "eligibleHttpIcons": eligible_http_icons,
@@ -322,6 +393,25 @@ def build_snapshot(source: Path, config_path: Path) -> tuple[dict[str, Any], dic
             career_audit, key=lambda item: (item["nickname"], item["playerId"])
         ),
         "championshipRosterSource": roster_doc.get("source"),
+        "profileReview": {
+            "scope": "Full snapshot consistency checks, not individual official biography verification",
+            "teamCountRule": "Distinct franchise IDs with at least one recorded KPL game; no unused substitutes or academy entries",
+            "countedPlayers": len(quiz_players),
+            "incompleteTeamHistory": [p["id"] for p in quiz_players if not p["teamCountComplete"]],
+            "multiplePositionReview": [p["id"] for p in quiz_players if len(p["positions"]) >= 3],
+            "missingKplDebut": [p["id"] for p in quiz_players if p["debutYear"] is None],
+            "manualCorrections": sorted(corrections),
+        },
+        "championshipOfficialEvidence": [
+            {"eventId": event["id"], "url": event["officialSource"], "verifiedAt": event["verifiedAt"]}
+            for event in roster_doc.get("events", []) if event.get("officialSource")
+        ],
+        "championshipPendingReview": [
+            {"playerId": player["id"], "nickname": player["nickname"],
+             "championshipCount": player["championshipCount"]}
+            for player in quiz_players
+            if player["nickname"] in roster_doc.get("unresolvedNicknames", [])
+        ],
         "championshipRosterOverrides": sorted(
             roster_audit, key=lambda item: (item["nickname"], item["playerId"])
         ),
@@ -348,7 +438,7 @@ def validate(snapshot: dict[str, Any], audit: dict[str, Any]) -> None:
     for player in players:
         if not player["nickname"] or not player["positions"]:
             raise ValueError(f"选手缺少必要字段：{player['id']}")
-        if player["debutYear"] > player["latestYear"]:
+        if player["debutYear"] is not None and player["debutYear"] > player["latestYear"]:
             raise ValueError(f"选手年份倒置：{player['id']}")
 
 
