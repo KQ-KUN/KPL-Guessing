@@ -18,40 +18,38 @@
       <section id="home-view" class="app-view home-view" aria-labelledby="home-title">
         <div class="home-hero">
           <div class="hero-copy">
-            <p class="eyebrow">KING PRO LEAGUE · PLAYER DEDUCTION</p>
-            <h1 id="home-title"><span>KPL</span> Guessing</h1>
-            <p class="hero-subtitle">根据战队、位置与生涯荣誉，逐步锁定本局的 KPL 选手。</p>
-            <div class="hero-actions"><a class="hero-primary" href="#classic">开始弗一把 <span>→</span></a><a class="hero-secondary" href="#library">浏览选手图鉴</a></div>
+            <h1 id="home-title">今天，猜谁？</h1>
+            <p class="hero-subtitle">猜出隐藏的选手，或让系统猜中你心中的人物。</p>
           </div>
           <div class="hero-preview" aria-hidden="true"><div class="preview-head"><span>CLASSIC / 8 GUESSES</span><b>弗一把</b></div><div class="preview-player"><span class="preview-avatar">?</span><div><strong>猜出这名选手</strong><small>属性反馈会缩小答案范围</small></div></div><div class="preview-grid"><span class="exact">战队 ✓</span><span class="partial">位置 ≈</span><span class="direction">首秀 ↑</span><span class="miss">FMVP ×</span></div><div class="preview-progress"><img src="./guessing-mark.svg" alt=""><img src="./guessing-mark.svg" alt=""><img src="./guessing-mark.svg" alt=""><img src="./guessing-mark.svg" alt=""></div></div>
         </div>
         <div class="mode-grid" aria-label="功能入口">
-          <a class="mode-card classic-card" href="#classic"><span class="mode-top"><span class="mode-index">01</span><span class="mode-icon" aria-hidden="true">▦</span></span><strong>弗一把</strong><p>每局随机一名目标选手，八次机会，根据九项属性反馈推理答案。</p><span class="mode-action">开始猜选手 <i>→</i></span></a>
-          <a class="mode-card network-card" href="#genius"><span class="mode-top"><span class="mode-index">02</span><span class="mode-icon" aria-hidden="true">⌁</span></span><strong>KPL天才</strong><p>心中想一位 KPL 选手、教练或解说，让系统通过问答猜出他是谁。</p><span class="mode-action">开始读心 <i>→</i></span></a>
-          <a class="mode-card library-card" href="#library"><span class="mode-top"><span class="mode-index">03</span><span class="mode-icon" aria-hidden="true">▥</span></span><strong>选手图鉴</strong><p>按战队和位置浏览选手，查看年度比赛数据、英雄池与生涯轨迹。</p><span class="mode-action">进入图鉴 <i>→</i></span></a>
+          <a class="mode-card classic-card" href="#classic"><strong>弗一把</strong><p>8 次机会，根据九项线索猜选手</p><span class="mode-action" aria-hidden="true">→</span></a>
+          <a class="mode-card network-card" href="#genius"><strong>KPL天才</strong><p>回答问题，让系统猜人物</p><span class="mode-action" aria-hidden="true">→</span></a>
+          <a class="mode-card library-card" href="#library"><strong>选手图鉴</strong><p>查选手数据、英雄池与生涯</p><span class="mode-action" aria-hidden="true">→</span></a>
         </div>
       </section>
 
       <section id="classic-view" class="app-view classic-view" aria-labelledby="classic-title" hidden>
-        <header class="view-header"><a class="back-link" href="#home">← 返回首页</a><div><p class="eyebrow">CLASSIC MODE</p><h1 id="classic-title">弗一把</h1></div><span>八次机会 · 固定属性推理</span></header>
+        <header class="view-header"><a class="back-link" href="#home">← 返回首页</a><div><h1 id="classic-title">弗一把</h1></div><span>8 次机会，根据九项线索猜选手</span></header>
         <section class="control-panel" aria-label="游戏设置">
           <div class="control-group"><span>难度</span><div id="difficulty-control" class="segmented"><button type="button" data-difficulty="popular" aria-pressed="true">入门</button><button type="button" data-difficulty="normal" aria-pressed="false">标准</button><button type="button" data-difficulty="hardcore" aria-pressed="false">硬核</button></div></div>
           <button id="reveal-answer" class="reveal-answer-button" type="button">查看答案</button>
         </section>
-        <section class="play-panel" aria-label="猜选手"><div class="round-status"><div><span id="round-label">弗一把</span><strong id="remaining-label">剩余 8 次</strong></div><div id="stats-summary" class="stats-summary">0 胜 / 0 局</div></div><div class="game-status-line"><span id="guess-progress" class="guess-progress" aria-label="猜测进度"></span><span>绿色完全相同，黄色部分相关，箭头指向答案</span></div></section>
+        <section class="play-panel" aria-label="猜选手"><div class="round-status"><div><span id="round-label">弗一把</span><strong id="remaining-label">剩余 8 次</strong></div><div id="stats-summary" class="stats-summary">0 胜 / 0 局</div></div><div class="game-status-line"><span id="guess-progress" class="guess-progress" aria-label="猜测进度"></span></div></section>
         <section class="legend" aria-label="反馈图例"><span><i class="legend-swatch exact"></i>完全相同 ✓</span><span><i class="legend-swatch partial"></i>部分相关 ≈</span><span><i class="legend-swatch miss"></i>不相同 ×</span><span><i class="legend-swatch direction"></i>答案方向 ↑↓</span></section>
-        <section id="empty-state" class="empty-state"><span class="target-icon" aria-hidden="true">◎</span><h2>先猜一名你熟悉的选手</h2><p>每次提交都会生成一行反馈。看完颜色和箭头，在底部继续下一猜。</p></section>
+        <section id="empty-state" class="empty-state"><h2>输入昵称，开始第一猜</h2><p>选中搜索结果后提交，查看属性反馈。</p></section>
         <div id="board-header" class="board-header" aria-hidden="true" hidden><span>选手</span><span>最近战队</span><span>位置</span><span>KPL首秀</span><span>最近登场</span><span>冠军</span><span>决赛 FMVP</span><span>效力战队</span><span>征战赛事</span><span>小局数</span></div>
         <section id="board" class="board" aria-label="猜测记录"></section><section id="result-panel" class="result-panel" aria-live="polite" hidden></section>
       </section>
 
       <section id="genius-view" class="app-view genius-view" aria-labelledby="genius-title" hidden>
-        <header class="view-header genius-heading"><a class="back-link" href="#home">← 返回首页</a><div><p class="eyebrow">KPL MIND READER</p><h1 id="genius-title">KPL天才</h1></div><span>选手 · 教练 · 解说</span></header>
+        <header class="view-header genius-heading"><a class="back-link" href="#home">← 返回首页</a><div><h1 id="genius-title">KPL天才</h1></div><span>心中想一位选手、教练或解说</span></header>
         <div id="genius-root" class="genius-root" aria-live="polite"></div>
       </section>
 
       <section id="library-view" class="app-view library-view" aria-labelledby="library-title" hidden>
-        <header class="view-header library-heading"><a class="back-link" href="#home">← 返回首页</a><div><p class="eyebrow">KPL PLAYER ARCHIVE</p><h1 id="library-title">选手图鉴</h1><p>从战队出发，查看选手的年度表现与英雄池。</p></div><span class="library-kicker">与 KPL 2K 数据同源</span></header>
+        <header class="view-header library-heading"><a class="back-link" href="#home">← 返回首页</a><div><h1 id="library-title">选手图鉴</h1></div><span>选手的年度表现与英雄池</span></header>
         <p id="library-meta" class="library-meta">正在载入图鉴…</p>
         <div class="library-toolbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="library-query" aria-label="搜索选手" type="search" placeholder="搜索选手，如 Fly / 小胖 / 一诺" /></label><select id="library-team" aria-label="筛选战队"><option value="">全部战队</option></select><select id="library-position" aria-label="筛选位置"><option value="">全部位置</option><option>对抗路</option><option>打野</option><option>中路</option><option>发育路</option><option>游走</option></select><select id="library-sort" aria-label="排序方式"><option value="active">现役优先</option><option value="name">名字</option><option value="-mvp">MVP 总数 ↓</option><option value="-recent">最近登场</option></select></div>
         <div id="library-list" class="library-list"></div>

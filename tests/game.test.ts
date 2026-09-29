@@ -113,6 +113,11 @@ test("team count feedback compares recorded counts regardless of completeness", 
 });
 
 test("mobile nine clues use three columns and player identity spans the row", () => {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const header = html.match(/<div id="board-header"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
+  assert.deepEqual([...header.matchAll(/<span>(.*?)<\/span>/g)].map(match => match[1]),
+    ["选手", "最近战队", "位置", "KPL首秀", "最近登场", "冠军", "决赛 FMVP", "效力战队", "征战赛事", "小局数"]);
+  assert.match(html, /所有可比较的展示条件都符合，也算猜中/);
   const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
   const mobile = css.slice(css.indexOf("@media (max-width:540px)"));
   assert.match(mobile, /\.guess-row\s*\{\s*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);

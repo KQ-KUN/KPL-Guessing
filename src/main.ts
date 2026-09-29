@@ -1092,7 +1092,8 @@ function renderResult(target: QuizPlayer): void {
 function renderStats(): void {
   const stats = loadStats();
   const winRate = stats.games ? Math.round((stats.wins / stats.games) * 100) : 0;
-  statsSummary.textContent = `${stats.wins} 胜 / ${stats.games} 局 · 胜率 ${winRate}%`;
+  statsSummary.textContent = `${stats.wins} 胜 / ${stats.games} 局`;
+  statsSummary.setAttribute("aria-label", `${stats.wins} 胜 / ${stats.games} 局，胜率 ${winRate}%`);
 }
 
 
