@@ -44,11 +44,23 @@ test("official recent finals corrections are present in the shipped snapshot", (
   const data: QuizData = JSON.parse(readFileSync(new URL("../public/data/quiz_players.json", import.meta.url), "utf8"));
   const byName = new Map(data.players.map((entry) => [entry.nickname, entry]));
   const titles = { "道崽": 1, "风箫": 1, "一笙": 3, "小俞": 1, "清清": 3,
-    "皖皖": 1, "归期": 2, "小胖": 6, "星宇": 1, "玖欣": 1, "小屿": 1 };
+    "皖皖": 1, "紫幻": 2, "信": 1, "归期": 2, "小胖": 6, "星宇": 1, "玖欣": 1, "小屿": 1 };
   for (const [name, count] of Object.entries(titles)) {
     assert.equal(byName.get(name)?.championshipCount, count, name);
   }
   assert.equal(byName.get("信")?.hasFmvp, true);
+  const library = JSON.parse(readFileSync(new URL("../public/data/player_library.json", import.meta.url), "utf8")) as {
+    players: Array<{ name: string; championship_count: number; championship_events: string[] }>;
+  };
+  for (const name of ["清清", "皖皖", "紫幻", "道崽", "信"]) {
+    const cards = library.players.filter(entry => entry.name === name);
+    assert.ok(cards.length > 0, name);
+    for (const card of cards) {
+      assert.equal(card.championship_count, byName.get(name)?.championshipCount, name);
+      assert.ok(card.championship_events.includes("KCC2026"), name);
+      assert.ok(!card.championship_events.includes("KPL2026S2"), name);
+    }
+  }
 });
 
 function player(overrides: Partial<QuizPlayer> = {}): QuizPlayer {
